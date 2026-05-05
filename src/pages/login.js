@@ -1,37 +1,43 @@
 import React, { useState } from "react";
-import api from "../api";
 import { useNavigate } from "react-router-dom";
 
 function Login() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("student"); // "student" or "club"
+  const [role, setRole] = useState("student");
   const [interests, setInterests] = useState("");
   const [clubInfo, setClubInfo] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    const user = {
+  const handleLogin = () => {
+    // Simple validation
+    if (!name || !password) {
+      alert("Please enter username and password");
+      return;
+    }
+
+    // Dummy login logic
+    const userData = {
       name,
-      password,
       role,
-      ...(role === "student" ? { interests: interests.split(",").map(s => s.trim()).filter(Boolean) } : { clubInfo })
+      ...(role === "student"
+        ? { interests: interests.split(",").map(s => s.trim()).filter(Boolean) }
+        : { clubInfo })
     };
 
-    try {
-      const res = await api.post("/login", user);
-      localStorage.setItem("user", JSON.stringify(res.data));
-      navigate("/home");
-    } catch (err) {
-      console.error(err);
-      // Add user-facing error handling as needed
-    }
+    // Store in localStorage
+    localStorage.setItem("user", JSON.stringify(userData));
+
+    // Navigate to home page
+    navigate("/home");
   };
 
   return (
     <div className="login-page container">
       <div className="login-card">
+
+        {/* Role Toggle */}
         <div className="role-toggle">
           <button
             className={`role-btn ${role === "club" ? "active" : ""}`}
@@ -47,18 +53,26 @@ function Login() {
           </button>
         </div>
 
-        <h2 className="login-title">{role === "student" ? "Student Login" : "Club Login"}</h2>
+        <h2 className="login-title">
+          {role === "student" ? "Student Login" : "Club Login"}
+        </h2>
 
+        {/* Name Input */}
         <div className="input-pill">
           <span className="input-icon">✉️</span>
           <input
             type="text"
-            placeholder={role === "student" ? "Enter Name / Student ID" : "Club Name / Email"}
+            placeholder={
+              role === "student"
+                ? "Enter Name / Student ID"
+                : "Club Name / Email"
+            }
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
 
+        {/* Password Input */}
         <div className="input-pill">
           <span className="input-icon">🔒</span>
           <input
@@ -69,15 +83,17 @@ function Login() {
           />
         </div>
 
+        {/* Show Password */}
         <label className="show-password">
           <input
             type="checkbox"
             checked={showPassword}
             onChange={(e) => setShowPassword(e.target.checked)}
-          />{" "}
+          />
           Show Password
         </label>
 
+        {/* Extra Fields */}
         {role === "student" ? (
           <input
             className="form-control mb-2 simple-input"
@@ -94,9 +110,11 @@ function Login() {
           />
         )}
 
+        {/* Login Button */}
         <button className="btn primary-cta" onClick={handleLogin}>
           LOGIN
         </button>
+
       </div>
     </div>
   );
