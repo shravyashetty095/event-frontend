@@ -1,7 +1,13 @@
+// ...existing code...
 import React from "react";
 
 export default function EventCard({ event = {}, onRegister = null }) {
   const formattedDate = event.date ? new Date(event.date).toLocaleDateString() : "TBA";
+
+  // only allow showing register to logged-in students
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const isStudent = user && user.role === "student";
+
   return (
     <article className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
@@ -16,7 +22,7 @@ export default function EventCard({ event = {}, onRegister = null }) {
         )}
       </div>
 
-      {onRegister && (
+      {isStudent && onRegister && (
         <div style={{ marginTop: "auto" }}>
           <button className="btn primary" onClick={onRegister} aria-label="Register">
             Register
@@ -26,3 +32,4 @@ export default function EventCard({ event = {}, onRegister = null }) {
     </article>
   );
 }
+// ...existing code...
