@@ -5,7 +5,6 @@ function formatDate(dateValue) {
     return "To be announced";
   }
 
-<<<<<<< HEAD
   const parsedDate = new Date(dateValue);
   if (Number.isNaN(parsedDate.getTime())) {
     return dateValue;
@@ -27,18 +26,6 @@ export default function EventCard({
   const registrants = Array.isArray(event.registrants) ? event.registrants : [];
   const isStudent = currentUser?.role === "student";
   const isClub = currentUser?.role === "club";
-=======
-  // current user info
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  const isStudent = user && user.role === "student";
-  const isClubUser = user && user.role === "club";
-
-  // if the logged-in club owns this event, treat as owner (hide register)
-  const isOwner =
-    isClubUser &&
-    (event.clubId === user._id ||
-      (event.club && (event.club === user.name || event.club === user.email)));
->>>>>>> 15f00fb803a7a59a1fc8dafbb15b4ea2e15d57de
 
   return (
     <article className="event-card">
@@ -51,7 +38,6 @@ export default function EventCard({
         <span className="event-badge">{event.registrationCount || 0} registered</span>
       </div>
 
-<<<<<<< HEAD
       <p className="event-card__description">{event.description || "No description provided yet."}</p>
 
       <div className="event-meta-grid">
@@ -90,20 +76,9 @@ export default function EventCard({
         <div className="event-card__actions">
           <button className="btn btn-primary" type="button" onClick={onPrimaryAction} disabled={primaryActionDisabled}>
             {primaryActionLabel}
-=======
-      {/* show Register only to students and not to club owners */}
-      {isStudent && !isOwner && onRegister && (
-        <div style={{ marginTop: "auto" }}>
-          <button className="btn primary" onClick={onRegister} aria-label="Register">
-            Register
->>>>>>> 15f00fb803a7a59a1fc8dafbb15b4ea2e15d57de
           </button>
         </div>
       )}
     </article>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 15f00fb803a7a59a1fc8dafbb15b4ea2e15d57de
