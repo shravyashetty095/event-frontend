@@ -1,12 +1,13 @@
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { getCurrentUser, signOutAccount } from "../utils/storage";
 
 export default function Navbar() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const user = getCurrentUser();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    signOutAccount();
     navigate("/");
   };
 
@@ -14,19 +15,19 @@ export default function Navbar() {
     <nav className="app-navbar">
       <div className="container nav-inner">
         <div className="nav-left">
-          <NavLink to="/home" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+          <NavLink to={user ? (user.role === "club" ? "/club" : "/student") : "/"} className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
             Home
           </NavLink>
 
-          {/* only show Add Event to club users */}
           {user && user.role === "club" && (
-            <NavLink to="/add" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+            <Link to="/club/add" reloadDocument className="nav-link nav-link-button">
               Add Event
-            </NavLink>
+            </Link>
           )}
         </div>
 
         <div className="nav-right">
+          {user && <span className="nav-user">{user.name} · {user.role}</span>}
           <button className="logout-btn" onClick={handleLogout}>
             Logout
           </button>

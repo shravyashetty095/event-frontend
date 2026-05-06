@@ -1,164 +1,236 @@
-// ...existing code...
-import { useEffect, useState } from "react";
-import api from "../api";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import EventCard from "../components/eventcard";
-import { useNavigate, Link } from "react-router-dom";
+import {
+  getCurrentUser,
+  getEventRegistrations,
+  getEventSummary,
+  getEvents,
+  getEventsForClub,
+  getUserRegistrations,
+  isUserRegisteredForEvent,
+  registerForEvent,
+} from "../utils/storage";
 
 function Home() {
   const [events, setEvents] = useState([]);
   const [recommended, setRecommended] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const user = getCurrentUser();
   const navigate = useNavigate();
 
-  // fetchEvents defined before useEffect to avoid TDZ / reference errors
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/events");
-      const all = res.data || [];
-      setEvents(all);
-
-      if (user && user.role === "student" && Array.isArray(user.interests)) {
-        const rec = all.filter((ev) =>
-          Array.isArray(ev.tags) && ev.tags.some((tag) => user.interests.includes(tag))
-        );
-        setRecommended(rec);
-      } else {
-        setRecommended([]);
-      }
-    } catch (err) {
-      console.error("Failed to load events", err);
-      setEvents([]);
-      setRecommended([]);
-    } finally {
-      setLoading(false);
+  const loadDashboard = useCallback(() => {
+    if (!user) {
+      return;
     }
-  };
+
+    const allEvents = getEvents();
+    const userRegistrations = getUserRegistrations(user.id);
+
+    setEvents(allEvents);
+    setRegistrations(userRegistrations);
+
+    if (user.role === "student" && Array.isArray(user.interests)) {
+      const registeredEventIds = new Set(userRegistrations.map((registration) => registration.eventId));
+      const matchedEvents = allEvents.filter(
+        (event) =>
+          Array.isArray(event.tags) &&
+          event.tags.some((tag) => user.interests.includes(tag)) &&
+          !registeredEventIds.has(event.id)
+      );
+      setRecommended(matchedEvents);
+    } else {
+      setRecommended([]);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
       navigate("/");
       return;
     }
-    fetchEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  const handleRegister = async (eventId) => {
-    if (!user) {
-      alert("Please login to register.");
-      navigate("/");
-      return;
-    }
+    setLoading(true);
+    loadDashboard();
+    setLoading(false);
+  }, [loadDashboard, navigate, user]);
+
+  if (!user) {
+    return null;
+  }
+
+  const isStudent = user.role === "student";
+  const isClub = user.role === "club";
+  const hostedEvents = isClub ? getEventsForClub(user.id) : [];
+  const totalRegistrations = isClub
+    ? events.reduce((sum, event) => sum + getEventRegistrations(event.id).length, 0)
+    : registrations.length;
+  const registeredEvents = registrations
+    .map((registration) => events.find((event) => event.id === registration.eventId))
+    .filter(Boolean);
+  const enrichedEvents = events.map((event) => getEventSummary(event));
+
+  const handleRegister = (eventId) => {
     try {
-      await api.post("/register", { userId: user._id, eventId });
-      alert("Registered successfully!");
-      // optionally refresh events or registrations here
-    } catch (err) {
-      console.error(err);
-      alert("Registration failed");
+      registerForEvent({ eventId, user });
+      setLoading(true);
+      loadDashboard();
+      setLoading(false);
+    } catch (error) {
+      alert(error.message || "Registration failed.");
     }
   };
 
-  const isStudent = user && user.role === "student";
-  const isClub = user && user.role === "club";
-
   return (
-    <main className="container mt-4">
-      <section className="home-hero card">
-        <div className="hero-left">
-          <h1 className="hero-title">
+    <main className="page-shell dashboard-shell">
+      <section className="hero-panel">
+        <div className="hero-copy">
+          <p className="eyebrow">{isStudent ? "Student dashboard" : "Club dashboard"}</p>
+          <h1>{isStudent ? `Welcome back, ${user.name}` : `Hello, ${user.name}`}</h1>
+          <p>
             {isStudent
-              ? `Welcome${user && user.name ? `, ${user.name}` : ""} — discover events you'll love`
-              : isClub
-              ? `Welcome${user && user.name ? `, ${user.name}` : ""} — manage your club events`
-              : "Welcome to EventSystem"}
-          </h1>
-
-          <p className="hero-sub">
-            {isStudent
-              ? "Curated campus events, simple registration and personalised recommendations based on your interests."
-              : isClub
-              ? "Create, manage and promote events to reach students across the campus."
-              : "Discover and join campus activities."}
+              ? "Browse campus events, register in one click, and keep track of everything you've joined."
+              : "Create events for your club and see attendance counts update automatically for every event."}
           </p>
 
-          {isStudent && Array.isArray(user?.interests) && user.interests.length > 0 && (
-            <div className="interest-chips" aria-hidden>
-              {user.interests.map((it) => (
-                <span key={it} className="chip">
-                  {it}
+          {isStudent && Array.isArray(user.interests) && user.interests.length > 0 && (
+            <div className="chip-row">
+              {user.interests.map((interest) => (
+                <span key={interest} className="chip">
+                  {interest}
                 </span>
               ))}
             </div>
           )}
         </div>
 
-        <div className="hero-right">
-          <div className="stats">
-            <div className="stat">
-              <div className="stat-value">{events.length}</div>
-              <div className="stat-label">Events</div>
-            </div>
-            <div className="stat">
-              <div className="stat-value">{recommended.length}</div>
-              <div className="stat-label">Recommended</div>
-            </div>
+        <div className="hero-actions">
+          <div className="stat-grid">
+            <article className="stat-card">
+              <strong>{events.length}</strong>
+              <span>Events</span>
+            </article>
+            <article className="stat-card">
+              <strong>{recommended.length}</strong>
+              <span>Matches</span>
+            </article>
+            <article className="stat-card">
+              <strong>{totalRegistrations}</strong>
+              <span>Registrations</span>
+            </article>
           </div>
 
           {isClub ? (
-            <Link to="/add" className="btn primary hero-cta">
-              Add Event
+            <Link to="/club/add" reloadDocument className="btn btn-primary">
+              Add event
             </Link>
           ) : (
-            <button className="btn ghost hero-cta" onClick={() => window.scrollTo({ top: 500, behavior: "smooth" })}>
-              Browse Events
+            <button className="btn btn-secondary" type="button" onClick={() => document.getElementById("all-events")?.scrollIntoView({ behavior: "smooth" })}>
+              Browse events
             </button>
           )}
         </div>
       </section>
 
-      <section className="mt-5">
-        <h2 className="section-title">All Events</h2>
+      {isStudent && (
+        <section className="content-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">My registrations</p>
+              <h2>{registeredEvents.length} events joined</h2>
+            </div>
+          </div>
+
+          {registeredEvents.length === 0 ? (
+            <p className="empty-state">You have not registered for any events yet. Use the buttons below to join one.</p>
+          ) : (
+            <div className="event-grid">
+              {registeredEvents.map((event) => (
+                <EventCard key={event.id} event={getEventSummary(event)} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {isClub && (
+        <section className="content-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Hosted events</p>
+              <h2>Your event performance</h2>
+            </div>
+            <Link to="/club/add" reloadDocument className="btn btn-secondary">
+              Create new event
+            </Link>
+          </div>
+
+          {hostedEvents.length === 0 ? (
+            <p className="empty-state">No events created yet. Add your first event to start receiving registrations.</p>
+          ) : (
+            <div className="event-grid">
+              {hostedEvents.map((event) => (
+                <EventCard key={event.id} event={getEventSummary(event)} registrantsVisible />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="content-panel" id="all-events">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">Campus events</p>
+            <h2>All upcoming events</h2>
+          </div>
+        </div>
 
         {loading ? (
-          <p className="muted">Loading events…</p>
-        ) : events.length === 0 ? (
-          <div className="placeholder card">
-            <h3>No events yet</h3>
-            <p className="muted">
-              Follow clubs or ask admins to add events. {isClub ? "Use the button above to create one." : "Check back later or contact clubs for upcoming events."}
-            </p>
-            {isClub && (
-              <button className="btn primary" onClick={() => navigate("/add")}>
-                Create Event
-              </button>
-            )}
-          </div>
+          <p className="empty-state">Loading events…</p>
+        ) : enrichedEvents.length === 0 ? (
+          <p className="empty-state">No events are available yet.</p>
         ) : (
-          <div className="event-list">
-            {events.map((event) => (
-              <EventCard
-                key={event._id}
-                event={event}
-                onRegister={isStudent ? () => handleRegister(event._id) : null}
-              />
-            ))}
+          <div className="event-grid">
+            {enrichedEvents.map((event) => {
+              const registered = isStudent ? isUserRegisteredForEvent(event.id, user.id) : false;
+
+              return (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  currentUser={user}
+                  onPrimaryAction={isStudent ? () => handleRegister(event.id) : null}
+                  primaryActionLabel={isStudent ? (registered ? "Registered" : "Register") : "View"}
+                  primaryActionDisabled={registered}
+                />
+              );
+            })}
           </div>
         )}
       </section>
 
       {isStudent && (
-        <section className="mt-5">
-          <h2 className="section-title">Recommended for you</h2>
+        <section className="content-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Recommended</p>
+              <h2>Events matched to your interests</h2>
+            </div>
+          </div>
+
           {recommended.length === 0 ? (
-            <p className="muted">No recommendations yet — update your interests to get better matches.</p>
+            <p className="empty-state">Add more interests to improve your recommendations.</p>
           ) : (
-            <div className="event-list">
+            <div className="event-grid">
               {recommended.map((event) => (
-                <EventCard key={event._id} event={event} onRegister={() => handleRegister(event._id)} />
+                <EventCard
+                  key={event.id}
+                  event={getEventSummary(event)}
+                  currentUser={user}
+                  onPrimaryAction={() => handleRegister(event.id)}
+                  primaryActionLabel="Register"
+                />
               ))}
             </div>
           )}
